@@ -9,69 +9,6 @@ import {
 
 const API_URL = 'http://localhost/api_tickets';
 
-const initialTickets = [
-  {
-    id: 1,
-    subjek: 'Gangguan Internet Lambat',
-    idPelanggan: 'CID001',
-    dispatcher: 'Helpdesk',
-    status: 'In Progress',
-    tanggalTicket: '2026-10-01 08:30',
-    history: [
-      { status: 'NEW', date: '2026-10-01 08:30', user: 'System', notes: 'Tiket dibuat' },
-      { status: 'In Progress', date: '2026-10-01 08:45', user: 'Helpdesk', notes: 'Pengecekan awal link' }
-    ]
-  },
-  {
-    id: 2,
-    subjek: 'Router LOS',
-    idPelanggan: 'CID002',
-    dispatcher: 'Technical Support',
-    status: 'NEW',
-    tanggalTicket: '2026-10-02 10:15',
-    history: [
-      { status: 'NEW', date: '2026-10-02 10:15', user: 'System', notes: 'Tiket dibuat' }
-    ]
-  },
-  {
-    id: 3,
-    subjek: 'Kabel Putus',
-    idPelanggan: 'CID003',
-    dispatcher: 'NOC',
-    status: 'Closed',
-    tanggalTicket: '2026-10-02 14:00',
-    history: [
-      { status: 'NEW', date: '2026-10-02 14:00', user: 'System', notes: 'Tiket dibuat' },
-      { status: 'In Progress', date: '2026-10-02 14:20', user: 'NOC', notes: 'Tim menuju lokasi' },
-      { status: 'Resolved', date: '2026-10-02 16:00', user: 'NOC', notes: 'Kabel tersambung' },
-      { status: 'Closed', date: '2026-10-02 16:30', user: 'Admin', notes: 'Konfirmasi pelanggan OK' }
-    ]
-  },
-  {
-    id: 4,
-    subjek: 'Koneksi Terputus (RTO)',
-    idPelanggan: 'CID004',
-    dispatcher: 'Technical Support',
-    status: 'In Progress',
-    tanggalTicket: '2026-10-03 09:00',
-    history: [
-      { status: 'NEW', date: '2026-10-03 09:00', user: 'System', notes: 'Tiket dibuat' },
-      { status: 'In Progress', date: '2026-10-03 09:30', user: 'Technical Support', notes: 'Cek routing OSPF' }
-    ]
-  },
-  {
-    id: 5,
-    subjek: 'Modem Mati Total',
-    idPelanggan: 'CID005',
-    dispatcher: 'Helpdesk',
-    status: 'NEW',
-    tanggalTicket: '2026-10-04 07:45',
-    history: [
-      { status: 'NEW', date: '2026-10-04 07:45', user: 'System', notes: 'Tiket dibuat' }
-    ]
-  }
-];
-
 export default function App() {
   // State untuk Data Persisten
   const [currentUser, setCurrentUser] = useState(() => {
@@ -125,19 +62,6 @@ export default function App() {
 
   const [storageError, setStorageError] = useState('');
 
-  // Sync dengan LocalStorage setiap kali state berubah
-  /*
-  useEffect(() => {
-    try {
-      localStorage.setItem('lifemedia_tickets', JSON.stringify(tickets));
-      setStorageError('');
-    } catch (error) {
-      console.error("Local storage error:", error);
-      setStorageError('Penyimpanan browser penuh. Sistem gagal menyimpan data secara permanen karena ukuran foto terlalu besar.');
-    }
-  }, [tickets]);
-  */
-
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('lifemedia_current_user', JSON.stringify(currentUser));
@@ -174,76 +98,14 @@ export default function App() {
   const [newDispatcher, setNewDispatcher] = useState('Technical Support');
   const [newDeskripsi, setNewDeskripsi] = useState('');
   const [newDokumentasi, setNewDokumentasi] = useState(null);
+  const [createError, setCreateError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   // Form Edit State
   const [editStatus, setEditStatus] = useState('NEW');
   const [editDeskripsiUpdate, setEditDeskripsiUpdate] = useState('');
   const [editDokumentasi, setEditDokumentasi] = useState(null);
   const [updateError, setUpdateError] = useState('');
-
-  // Helpers: Modul Kompresi Foto
-  const processImageToCompressBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.readAsDataURL(file);
-
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-
-          ctx.drawImage(
-            img,
-            0,
-            0,
-            width,
-            height
-          );
-
-          resolve(
-            canvas.toDataURL('image/jpeg', 0.7)
-          );
-        };
-
-        img.onerror = error => reject(error);
-      };
-
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  const getCurrentDateStr = () => {
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, '0');
-
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -345,18 +207,60 @@ export default function App() {
     setLoginPassword('');
   };
 
+  // ================= UPLOAD IMAGE =================
+  const uploadImage = async (file) => {
+    if (!file) return null;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await fetch(`${API_URL}/upload_image.php`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      throw new Error(`Upload HTTP Error ${res.status}`);
+    }
+
+    const result = await res.json();
+
+    console.log("Response upload:", result);
+
+    if (result.status !== 'success') {
+      throw new Error(result.message || 'Upload gambar gagal');
+    }
+
+    return result.url;
+  };
+
+  // ================= CREATE TICKET (SUDAH DIPERBAIKI) =================
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
 
-    const payload = {
-      idPelanggan: newIdPelanggan,
-      subjek: newSubjek,
-      dispatcher: newDispatcher,
-      deskripsi: newDeskripsi,
-      user: currentUser?.username || 'Admin'
-    };
-
     try {
+      setCreateError('');
+      setIsCreating(true);
+
+      // 1. Upload foto terlebih dahulu (jika ada)
+      let attachmentUrl = '';
+
+      if (newDokumentasi) {
+        attachmentUrl = await uploadImage(newDokumentasi);
+      }
+
+      // 2. Kirim data tiket beserta URL foto
+      const payload = {
+        idPelanggan: newIdPelanggan,
+        subjek: newSubjek,
+        dispatcher: newDispatcher,
+        deskripsi: newDeskripsi,
+        attachment: attachmentUrl || '',
+        user: currentUser?.username || 'Admin'
+      };
+
+      console.log("Data create yang dikirim:", payload);
+
       const res = await fetch(`${API_URL}/create_ticket.php`, {
         method: 'POST',
         headers: {
@@ -365,122 +269,105 @@ export default function App() {
         body: JSON.stringify(payload)
       });
 
+      if (!res.ok) {
+        throw new Error(`HTTP Error ${res.status}`);
+      }
+
       const result = await res.json();
+
+      console.log("Response create:", result);
 
       if (result.status === 'success') {
         setIsCreateOpen(false);
         setNewSubjek('');
         setNewIdPelanggan('');
+        setNewDispatcher('Technical Support');
         setNewDeskripsi('');
+        setNewDokumentasi(null);
+        setCreateError('');
         fetchTickets();
       } else {
-        alert(
-          "Gagal membuat tiket: " +
-          result.message
-        );
+        setCreateError(result.message || 'Gagal membuat tiket.');
       }
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error create ticket:", err);
+      setCreateError(err.message || 'Tidak dapat terhubung ke server.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  const uploadImage = async (file) => {
-  if (!file) return null;
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  const res = await fetch(`${API_URL}/upload_image.php`, {
-    method: 'POST',
-    body: formData
-  });
-
-  if (!res.ok) {
-    throw new Error(`Upload HTTP Error ${res.status}`);
-  }
-
-  const result = await res.json();
-
-  console.log("Response upload:", result);
-
-  if (result.status !== 'success') {
-    throw new Error(result.message || 'Upload gambar gagal');
-  }
-
-  return result.url;
-};
-
   const handleUpdateSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!selectedTicket) {
-    setUpdateError('Ticket tidak ditemukan.');
-    return;
-  }
-
-  try {
-    setUpdateError('');
-
-    let attachmentUrl = '';
-
-    // Upload foto terlebih dahulu
-    if (editDokumentasi) {
-      attachmentUrl = await uploadImage(editDokumentasi);
+    if (!selectedTicket) {
+      setUpdateError('Ticket tidak ditemukan.');
+      return;
     }
 
-    const payload = {
-      id: Number(selectedTicket.id),
-      status: editStatus,
-      user: currentUser?.username || 'Admin',
-      notes: editDeskripsiUpdate || '',
-      attachment: attachmentUrl
-    };
-
-    console.log("Data update yang dikirim:", payload);
-
-    const res = await fetch(`${API_URL}/update_ticket.php`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP Error ${res.status}`);
-    }
-
-    const result = await res.json();
-
-    console.log("Response update:", result);
-
-    if (result.status === 'success') {
-      setIsEditOpen(false);
-      setEditDeskripsiUpdate('');
-      setEditDokumentasi(null);
+    try {
       setUpdateError('');
 
-      const updatedTickets = await fetchTickets();
+      let attachmentUrl = '';
 
-      if (updatedTickets) {
-        const updatedTicket = updatedTickets.find(
-          ticket => Number(ticket.id) === Number(selectedTicket.id)
-        );
-
-        if (updatedTicket) {
-          setSelectedTicket(updatedTicket);
-        }
+      // Upload foto terlebih dahulu
+      if (editDokumentasi) {
+        attachmentUrl = await uploadImage(editDokumentasi);
       }
 
-    } else {
-      setUpdateError(result.message || 'Gagal update tiket.');
-    }
+      const payload = {
+        id: Number(selectedTicket.id),
+        status: editStatus,
+        user: currentUser?.username || 'Admin',
+        notes: editDeskripsiUpdate || '',
+        attachment: attachmentUrl
+      };
 
-  } catch (err) {
-    console.error("Error update ticket:", err);
-    setUpdateError(err.message || 'Tidak dapat terhubung ke server.');
-  }
-};
+      console.log("Data update yang dikirim:", payload);
+
+      const res = await fetch(`${API_URL}/update_ticket.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP Error ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      console.log("Response update:", result);
+
+      if (result.status === 'success') {
+        setIsEditOpen(false);
+        setEditDeskripsiUpdate('');
+        setEditDokumentasi(null);
+        setUpdateError('');
+
+        const updatedTickets = await fetchTickets();
+
+        if (updatedTickets) {
+          const updatedTicket = updatedTickets.find(
+            ticket => Number(ticket.id) === Number(selectedTicket.id)
+          );
+
+          if (updatedTicket) {
+            setSelectedTicket(updatedTicket);
+          }
+        }
+
+      } else {
+        setUpdateError(result.message || 'Gagal update tiket.');
+      }
+
+    } catch (err) {
+      console.error("Error update ticket:", err);
+      setUpdateError(err.message || 'Tidak dapat terhubung ke server.');
+    }
+  };
 
   const handleDeleteConfirm = async (id) => {
     try {
@@ -677,10 +564,10 @@ export default function App() {
 
   const filteredTickets = userTickets.filter(t => {
     const matchSearch =
-      t.idPelanggan
+      String(t.idPelanggan || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      t.subjek
+      String(t.subjek || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
 
@@ -900,7 +787,7 @@ export default function App() {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
 
                   <h3 className="text-lg font-bold text-gray-800 mb-6">
-                    Statistik Ticket 2026
+                    Statistik Ticket {new Date().getFullYear()}
                   </h3>
 
                   <div className="h-64">
@@ -1049,9 +936,10 @@ export default function App() {
 
                 {currentUser.username === 'Admin' && (
                   <button
-                    onClick={() =>
-                      setIsCreateOpen(true)
-                    }
+                    onClick={() => {
+                      setCreateError('');
+                      setIsCreateOpen(true);
+                    }}
                     className="bg-[#a81c43] text-white px-4 py-2.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#8a1535] transition-colors shadow-sm font-medium"
                   >
                     <Plus size={18} />
@@ -1166,7 +1054,7 @@ export default function App() {
                     <tbody className="divide-y divide-gray-100">
 
                       {filteredTickets.map(
-                        (ticket, index) => (
+                        (ticket) => (
                           <tr
                             key={ticket.id}
                             className="hover:bg-gray-50 transition-colors"
@@ -1383,9 +1271,11 @@ export default function App() {
               </h3>
 
               <button
-                onClick={() =>
-                  setIsCreateOpen(false)
-                }
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setCreateError('');
+                  setNewDokumentasi(null);
+                }}
                 className="text-white hover:text-gray-200 transition-colors"
               >
                 <X size={20} />
@@ -1397,6 +1287,12 @@ export default function App() {
               onSubmit={handleCreateSubmit}
               className="p-6 space-y-4 text-sm text-gray-700"
             >
+
+              {createError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg font-medium">
+                  {createError}
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold mb-1.5">
@@ -1504,7 +1400,7 @@ export default function App() {
                     accept="image/*"
                     onChange={(e) =>
                       setNewDokumentasi(
-                        e.target.files[0]
+                        e.target.files[0] || null
                       )
                     }
                   />
@@ -1523,9 +1419,11 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setIsCreateOpen(false)
-                  }
+                  onClick={() => {
+                    setIsCreateOpen(false);
+                    setCreateError('');
+                    setNewDokumentasi(null);
+                  }}
                   className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Batal
@@ -1533,9 +1431,14 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="bg-[#a81c43] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#8a1535] transition-colors shadow-sm"
+                  disabled={isCreating}
+                  className={`bg-[#a81c43] text-white px-6 py-2 rounded-lg font-bold transition-colors shadow-sm ${
+                    isCreating
+                      ? 'opacity-60 cursor-not-allowed'
+                      : 'hover:bg-[#8a1535]'
+                  }`}
                 >
-                  Simpan Ticket
+                  {isCreating ? 'Menyimpan...' : 'Simpan Ticket'}
                 </button>
 
               </div>
@@ -1672,7 +1575,8 @@ export default function App() {
                           {hist.notes}
                         </p>
 
-                        {hist.attachment && (
+                        {hist.attachment &&
+                          hist.attachment !== 'null' && (
                           <div className="mt-3">
 
                             <img
@@ -1894,7 +1798,7 @@ export default function App() {
                     accept="image/*"
                     onChange={(e) =>
                       setEditDokumentasi(
-                        e.target.files[0]
+                        e.target.files[0] || null
                       )
                     }
                   />
